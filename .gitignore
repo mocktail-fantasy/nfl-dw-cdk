@@ -1,0 +1,46 @@
+# Dependency directories
+node_modules/
+
+# CDK asset output directory
+cdk.out/
+
+# CDK context file
+cdk.context.json
+
+# TypeScript compiled JavaScript files
+*.js
+*.js.map
+!jest.config.js
+
+# TypeScript declaration files
+*.d.ts
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Local env files
+.env
+.env.local
+
+# IDE and Editor directories
+.vscode/
+.idea/
+*.code-workspace
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Build output directories
+dist/
+build/
+out/
+
+# Log files
+*.log
+npm-debug.log*
+
+# Temporary files
+tmp/
+temp/
