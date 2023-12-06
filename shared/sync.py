@@ -7,7 +7,7 @@ from typing import Any
 from shared.config.env import  RAW_SCHEMA
 from shared.enums.file_type import FileType
 from shared.config.nfl_config import config_map
-from repositories.file_repo import DataFileRepo
+from shared.repositories.file_repo import DataFileRepo
 
 class UpdateS3:
     def __init__(self, s3_repo: Any, s3_bucket: str):
