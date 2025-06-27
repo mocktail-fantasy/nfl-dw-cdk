@@ -28,7 +28,6 @@ export class PipelineStack extends Stack {
             },
             commands: [
               "npm install -g aws-cdk@latest",
-              'npx cdk-assets publish --path dist/manifest.json',
               "npm ci",
             ],
           },
