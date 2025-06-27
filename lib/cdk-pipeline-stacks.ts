@@ -48,6 +48,9 @@ export class PipelineStack extends Stack {
           "lambda:*",
           "logs:*",
           "sts:GetCallerIdentity",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParameterHistory"
         ],
         resources: ["*"],
       }));
