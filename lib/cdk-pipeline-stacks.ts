@@ -101,6 +101,24 @@ export class PipelineStack extends Stack {
         project: assetPublishProject,
         input: cloudAssemblyOutput,
       });
+
+      assetPublishProject.addToRolePolicy(new iam.PolicyStatement({
+        actions: [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:GetBucketLocation",
+          "s3:ListBucket",
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+        ],
+        resources: ["*"],
+      }));
       
     const deployPipelineAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
       actionName: "Deploy_PipelineStack",
