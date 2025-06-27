@@ -229,6 +229,7 @@ export class DataWarehouseStack extends Stack {
     });
 
     new codepipeline.Pipeline(this, 'DataWarehousePipeline', {
+      pipelineType: codepipeline.PipelineType.V2,
       pipelineName: 'DW',
       stages: [
         {

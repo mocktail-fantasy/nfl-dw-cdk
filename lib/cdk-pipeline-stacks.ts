@@ -13,10 +13,10 @@ export class PipelineStack extends Stack {
     const cloudAssemblyOutput = new codepipeline.Artifact();
 
     const buildProject = new codebuild.PipelineProject(this, "CdkBuildProject", {
-      projectName: "CdkAppBuild",
+      projectName: "CdkPipelineBuild",
       description: "Synthesizes the CDK app",
       environment: {
-        buildImage: codebuild.LinuxBuildImage.STANDARD_7_0, // No Docker required
+        buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
         privileged: false,
       },
       buildSpec: codebuild.BuildSpec.fromObject({
@@ -24,10 +24,10 @@ export class PipelineStack extends Stack {
         phases: {
           install: {
             "runtime-versions": {
-              nodejs: "18",
+              nodejs: "20",
             },
             commands: [
-              "npm install -g aws-cdk@2.139.0",
+              "npm install -g aws-cdk@latest",
               "npm ci",
             ],
           },
@@ -88,7 +88,8 @@ export class PipelineStack extends Stack {
       });
 
     new codepipeline.Pipeline(this, "CdkPipeline", {
-      pipelineName: "MyCdkAppPipeline",
+      pipelineType: codepipeline.PipelineType.V2,
+      pipelineName: "CdkPipeline",
       stages: [
         {
           stageName: "Source",
