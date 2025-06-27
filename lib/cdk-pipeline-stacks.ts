@@ -50,7 +50,16 @@ export class PipelineStack extends Stack {
           "sts:GetCallerIdentity",
           "ssm:GetParameter",
           "ssm:GetParameters",
-          "ssm:GetParameterHistory"
+          "ssm:GetParameterHistory",
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:CompleteLayerUpload",
+          "ecr:CreateRepository",
+          "ecr:DescribeRepositories",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart",q
         ],
         resources: ["*"],
       }));
