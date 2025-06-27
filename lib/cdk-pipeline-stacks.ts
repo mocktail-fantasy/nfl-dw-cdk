@@ -46,7 +46,7 @@ export class PipelineStack extends Stack {
 
     const assetPublishProject = new codebuild.PipelineProject(this, "AssetPublishProject", {
         projectName: "CdkAssetsPublish",
-        description: "Publishes CDK assets (Lambda zips, Docker images) to S3/ECR",
+        description: "Publishes CDK assets to S3/ECR",
         environment: {
           buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
         },
