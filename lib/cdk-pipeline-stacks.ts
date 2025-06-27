@@ -28,6 +28,7 @@ export class PipelineStack extends Stack {
             },
             commands: [
               "npm install -g aws-cdk@latest",
+              'npx cdk-assets publish --path dist/manifest.json',
               "npm ci",
             ],
           },
@@ -75,7 +76,7 @@ export class PipelineStack extends Stack {
 
     const deployPipelineAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
       actionName: "Deploy_PipelineStack",
-      templatePath: cloudAssemblyOutput.atPath("PipelineStack.template.json"),
+      templatePath: cloudAssemblyOutput.atPath("CDKPipelineStack.template.json"),
       stackName: "CdkAppStack",
       adminPermissions: true,
     });
