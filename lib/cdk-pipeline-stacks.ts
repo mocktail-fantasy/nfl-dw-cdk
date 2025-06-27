@@ -1,23 +1,22 @@
-import {Stack, StackProps, SecretValue} from "aws-cdk-lib";
+import { Stack, StackProps, SecretValue } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import * as codepipeline from "aws-cdk-lib/aws-codepipeline";
 import * as codepipeline_actions from "aws-cdk-lib/aws-codepipeline-actions";
-import * as iam from "aws-cdk-lib/aws-iam";
+import * as codebuild from "aws-cdk-lib/aws-codebuild";
+import * as iam from 'aws-cdk-lib/aws-iam';
+
 
 export class PipelineStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     const sourceOutput = new codepipeline.Artifact();
-    const cloudAssemblyOutput = new codepipeline.Artifact();
 
-    const buildProject = new codebuild.PipelineProject(this, "CdkBuildProject", {
-      projectName: "CdkPipelineBuild",
-      description: "Synthesizes the CDK app",
+    const deployProject = new codebuild.PipelineProject(this, "CDKPipelineProject", {
+      projectName: "CdkPipelineProject",
+      description: "Synthesizes and deploys the CDK app",
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
-        privileged: false,
       },
       buildSpec: codebuild.BuildSpec.fromObject({
         version: "0.2",
@@ -33,53 +32,26 @@ export class PipelineStack extends Stack {
           },
           build: {
             commands: [
-              "npx cdk synth --output dist",
-              "npx cdk-assets publish"
+              "npx cdk deploy --all --require-approval never"
             ],
           },
         },
-        artifacts: {
-          "base-directory": "dist",
-          files: "**/*",
-        },
       }),
     });
-
-    const assetPublishProject = new codebuild.PipelineProject(this, "AssetPublishProject", {
-        projectName: "CdkAssetsPublish",
-        description: "Publishes CDK assets to S3/ECR",
-        environment: {
-          buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
-        },
-        buildSpec: codebuild.BuildSpec.fromObject({
-          version: "0.2",
-          phases: {
-            install: {
-              commands: [
-                "npm install -g aws-cdk"
-              ],
-            },
-            build: {
-              commands: [
-                "npx cdk-assets publish --path manifest.json"
-              ],
-            },
-          },
-        }),
-      });
-
-    buildProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: [
-        "cloudformation:*",
-        "s3:*",
-        "iam:PassRole",
-        "ec2:Describe*",
-        "lambda:*",
-        "logs:*",
-        "sts:GetCallerIdentity",
-      ],
-      resources: ["*"],
-    }));
+    
+    deployProject.addToRolePolicy(new iam.PolicyStatement({
+        actions: [
+          "cloudformation:*",
+          "s3:*",
+          "iam:PassRole",
+          "ec2:Describe*",
+          "lambda:*",
+          "logs:*",
+          "sts:GetCallerIdentity",
+        ],
+        resources: ["*"],
+      }));
+      
 
     const sourceAction = new codepipeline_actions.GitHubSourceAction({
       actionName: 'GitHub_Source',
@@ -90,50 +62,11 @@ export class PipelineStack extends Stack {
       branch: 'main',
     });
 
-    const buildAction = new codepipeline_actions.CodeBuildAction({
-      actionName: "Synth",
-      project: buildProject,
+    const deployAction = new codepipeline_actions.CodeBuildAction({
+      actionName: "DeployCdk",
+      project: deployProject,
       input: sourceOutput,
-      outputs: [cloudAssemblyOutput],
     });
-
-    // const assetPublishAction = new codepipeline_actions.CodeBuildAction({
-    //     actionName: 'PublishAssets',
-    //     project: assetPublishProject,
-    //     input: cloudAssemblyOutput,
-    //   });
-
-    //   assetPublishProject.addToRolePolicy(new iam.PolicyStatement({
-    //     actions: [
-    //       "s3:PutObject",
-    //       "s3:GetObject",
-    //       "s3:GetBucketLocation",
-    //       "s3:ListBucket",
-    //       "ecr:GetAuthorizationToken",
-    //       "ecr:BatchCheckLayerAvailability",
-    //       "ecr:GetDownloadUrlForLayer",
-    //       "ecr:BatchGetImage",
-    //       "ecr:PutImage",
-    //       "ecr:InitiateLayerUpload",
-    //       "ecr:UploadLayerPart",
-    //       "ecr:CompleteLayerUpload",
-    //     ],
-    //     resources: ["*"],
-    //   }));
-      
-    const deployPipelineAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
-      actionName: "Deploy_PipelineStack",
-      templatePath: cloudAssemblyOutput.atPath("PipelineStack.template.json"),
-      stackName: "PipelineStack",
-      adminPermissions: true,
-    });
-
-    const deployDataWarehouseAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
-        actionName: "Deploy_DataWarehouse",
-        templatePath: cloudAssemblyOutput.atPath("DataWarehouseStack.template.json"),
-        stackName: "DataWarehouseStack",
-        adminPermissions: true,
-      });
 
     new codepipeline.Pipeline(this, "Pipeline", {
       pipelineType: codepipeline.PipelineType.V2,
@@ -144,16 +77,8 @@ export class PipelineStack extends Stack {
           actions: [sourceAction],
         },
         {
-          stageName: "Build",
-          actions: [buildAction],
-        },
-        // {
-        //   stageName: "Assets",
-        //   actions: [assetPublishAction],
-        // },
-        {
           stageName: "Deploy",
-          actions: [deployPipelineAction, deployDataWarehouseAction],
+          actions: [deployAction],
         },
       ],
     });
