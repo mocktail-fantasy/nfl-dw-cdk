@@ -34,6 +34,7 @@ export class PipelineStack extends Stack {
           build: {
             commands: [
               "npx cdk synth --output dist",
+              "npx cdk-assets publish"
             ],
           },
         },
@@ -96,29 +97,29 @@ export class PipelineStack extends Stack {
       outputs: [cloudAssemblyOutput],
     });
 
-    const assetPublishAction = new codepipeline_actions.CodeBuildAction({
-        actionName: 'PublishAssets',
-        project: assetPublishProject,
-        input: cloudAssemblyOutput,
-      });
+    // const assetPublishAction = new codepipeline_actions.CodeBuildAction({
+    //     actionName: 'PublishAssets',
+    //     project: assetPublishProject,
+    //     input: cloudAssemblyOutput,
+    //   });
 
-      assetPublishProject.addToRolePolicy(new iam.PolicyStatement({
-        actions: [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:GetBucketLocation",
-          "s3:ListBucket",
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-        ],
-        resources: ["*"],
-      }));
+    //   assetPublishProject.addToRolePolicy(new iam.PolicyStatement({
+    //     actions: [
+    //       "s3:PutObject",
+    //       "s3:GetObject",
+    //       "s3:GetBucketLocation",
+    //       "s3:ListBucket",
+    //       "ecr:GetAuthorizationToken",
+    //       "ecr:BatchCheckLayerAvailability",
+    //       "ecr:GetDownloadUrlForLayer",
+    //       "ecr:BatchGetImage",
+    //       "ecr:PutImage",
+    //       "ecr:InitiateLayerUpload",
+    //       "ecr:UploadLayerPart",
+    //       "ecr:CompleteLayerUpload",
+    //     ],
+    //     resources: ["*"],
+    //   }));
       
     const deployPipelineAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
       actionName: "Deploy_PipelineStack",
@@ -146,10 +147,10 @@ export class PipelineStack extends Stack {
           stageName: "Build",
           actions: [buildAction],
         },
-        {
-          stageName: "Assets",
-          actions: [assetPublishAction],
-        },
+        // {
+        //   stageName: "Assets",
+        //   actions: [assetPublishAction],
+        // },
         {
           stageName: "Deploy",
           actions: [deployPipelineAction, deployDataWarehouseAction],
