@@ -104,8 +104,8 @@ export class PipelineStack extends Stack {
       
     const deployPipelineAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
       actionName: "Deploy_PipelineStack",
-      templatePath: cloudAssemblyOutput.atPath("CDKPipelineStack.template.json"),
-      stackName: "CdkAppStack",
+      templatePath: cloudAssemblyOutput.atPath("PipelineStack.template.json"),
+      stackName: "PipelineStack",
       adminPermissions: true,
     });
 
@@ -116,9 +116,9 @@ export class PipelineStack extends Stack {
         adminPermissions: true,
       });
 
-    new codepipeline.Pipeline(this, "CdkPipeline", {
+    new codepipeline.Pipeline(this, "Pipeline", {
       pipelineType: codepipeline.PipelineType.V2,
-      pipelineName: "CdkPipeline",
+      pipelineName: "Pipeline",
       stages: [
         {
           stageName: "Source",
