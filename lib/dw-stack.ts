@@ -9,6 +9,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as codepipeline from 'aws-cdk-lib/aws-codepipeline';
 import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
+import { DockerImageAsset } from 'aws-cdk-lib/aws-ecr-assets';
 import { SecretValue } from 'aws-cdk-lib';
 import { RemovalPolicy, Stack, StackProps, Duration, Size } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
@@ -71,9 +72,29 @@ export class DataWarehouseStack extends Stack {
         },
         {
           name: 'private',
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-        },
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED
+        }
       ],
+    });
+
+    vpc.addGatewayEndpoint('S3Endpoint', {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+    });
+    
+    vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+    });
+    
+    vpc.addInterfaceEndpoint('CodeBuildLogsEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+    });
+
+    vpc.addInterfaceEndpoint('EcrApiEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR,
+    });
+    
+    vpc.addInterfaceEndpoint('EcrDockerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
     });
     
     const rdsSecurityGroup = new ec2.SecurityGroup(this, 'RDSSecurityGroup', {
@@ -81,12 +102,6 @@ export class DataWarehouseStack extends Stack {
       description: 'Security group for RDS PostgreSQL instance',
       allowAllOutbound: true,
     });
-
-    rdsSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(5432),
-      'Allow public access to PostgreSQL'
-    );
 
     const parameterGroup = new rds.ParameterGroup(this, 'ParameterGroup', {
       engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_15_4}),
@@ -106,112 +121,104 @@ export class DataWarehouseStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY,
       deletionProtection: false,
       parameterGroup: parameterGroup,
-      publiclyAccessible: true,
+      securityGroups: [rdsSecurityGroup],
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PUBLIC,
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
     });
 
+    const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
+      vpc,
+      description: 'Security Group for EC2 (no SSH, Session Manager only)',
+      allowAllOutbound: true,
+    });
+
+    const codeBuildSecurityGroup = new ec2.SecurityGroup(this, 'CodeBuildSecurityGroup', {
+      vpc,
+      description: 'Security group for CodeBuild access to RDS',
+      allowAllOutbound: true,
+    });
+
+    rdsSecurityGroup.addIngressRule(
+      codeBuildSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from CodeBuild'
+    );
     
-    // This is how I should access postgress but it become too expesneive
-    // Due to me needing a natgateway to access the internet from the VPC
+    const ssMRole = new iam.Role(this, 'BastionSSMRole', {
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+      description: 'Role for EC2 instance to connect via Session Manager',
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+      ],
+    });
 
-
-    // const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
-    //   vpc,
-    //   description: 'Security Group for EC2 (no SSH, Session Manager only)',
-    //   allowAllOutbound: true,
-    // });
-
-    // const codeBuildSecurityGroup = new ec2.SecurityGroup(this, 'CodeBuildSecurityGroup', {
-    //   vpc,
-    //   description: 'Security group for CodeBuild access to RDS',
-    //   allowAllOutbound: true,
-    // });
-
-    // rdsSecurityGroup.addIngressRule(
-    //   ec2.Peer.anyIpv4(),
-    //   ec2.Port.tcp(5432),
-    //   'Allow public access to PostgreSQL'
-    // );
-
-    // rdsSecurityGroup.addIngressRule(
-    //   codeBuildSecurityGroup,
-    //   ec2.Port.tcp(5432),
-    //   'Allow PostgreSQL access from CodeBuild'
-    // );
-    
-    // rdsSecurityGroup.addIngressRule(
-    //   ec2SecurityGroup, 
-    //   ec2.Port.tcp(5432),
-    //   'Allow PostgreSQL access from EC2 instance'
-    // );
-
-    // const ssMRole = new iam.Role(this, 'BastionSSMRole', {
-    //   assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-    //   description: 'Role for EC2 instance to connect via Session Manager',
-    //   managedPolicies: [
-    //     iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
-    //   ],
-    // });
-
-    // const bastion = new ec2.Instance(this, 'BastionHost', {
-    //   vpc,
-    //   role: ssMRole,
-    //   instanceType: new ec2.InstanceType('t3.micro'),
-    //   machineImage: ec2.MachineImage.latestAmazonLinux2023(),
-    //   securityGroup: ec2SecurityGroup,
-    //   vpcSubnets: {
-    //     subnetType: ec2.SubnetType.PUBLIC,
-    //   },
-    //   keyName: 'dw-bastion-admin', // created in the console
-    // });
+    const bastion = new ec2.Instance(this, 'BastionHost', {
+      vpc,
+      role: ssMRole,
+      instanceType: new ec2.InstanceType('t3.micro'),
+      machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+      securityGroup: ec2SecurityGroup,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC,
+      },
+      keyName: 'dw-bastion-admin', // created in the console
+    });
 
     const sourceArtifact = new codepipeline.Artifact();
 
     const sourceAction = new codepipeline_actions.GitHubSourceAction({
       actionName: 'GitHub_Source',
       owner: 'mocktail-fantasy',
-      repo: 'dwh-sql', // Replace with your repository name
+      repo: 'dwh-sql', 
       oauthToken: SecretValue.secretsManager('GitHubOAuthToken'), // This was created manually in the AWS Secrets Manager console
       output: sourceArtifact,
       branch: 'main',
     });
     
+    const postgresImageAsset = new DockerImageAsset(this, 'PostgresDockerImage', {
+      directory: path.join(__dirname, '../docker'),
+    });
+
     const buildProject = new codebuild.PipelineProject(this, 'DataWarehouseBuildProject', {
       projectName: 'DW',
       description: 'Builds SQL scripts',
+      vpc: vpc,
       subnetSelection: { subnetType: ec2.SubnetType.PUBLIC },
       environment: {
-        buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
+        buildImage: codebuild.LinuxBuildImage.fromDockerRegistry(postgresImageAsset.imageUri),
+        privileged: false,
       },
       buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
     });
     
-
-      buildProject.addToRolePolicy(new iam.PolicyStatement({
-        actions: [
-          // Required for networking/VPC access
-          'ec2:DescribeSubnets',
-          'ec2:DescribeSecurityGroups',
-          'ec2:DescribeNetworkInterfaces',
-          'ec2:CreateNetworkInterface',
-          'ec2:DeleteNetworkInterface',
-          'ec2:DescribeDhcpOptions',
-          'ec2:DescribeVpcs',
-          'ec2:DescribeAvailabilityZones',
-          'ec2:AttachNetworkInterface',
-          'ec2:DetachNetworkInterface',
-          'logs:CreateLogGroup',
-          'logs:CreateLogStream',
-          'logs:PutLogEvents',
-          's3:GetObject',
-          's3:GetBucketLocation',
-          's3:ListBucket',
-        ],
-        resources: ['*'],
-      }));
-      
+    buildProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        // Required for networking/VPC access
+        'ec2:DescribeSubnets',
+        'ec2:DescribeSecurityGroups',
+        'ec2:DescribeNetworkInterfaces',
+        'ec2:CreateNetworkInterface',
+        'ec2:DeleteNetworkInterface',
+        'ec2:DescribeDhcpOptions',
+        'ec2:DescribeVpcs',
+        'ec2:DescribeAvailabilityZones',
+        'ec2:AttachNetworkInterface',
+        'ec2:DetachNetworkInterface',
+        'logs:CreateLogGroup',
+        'logs:CreateLogStream',
+        'logs:PutLogEvents',
+        's3:GetObject',
+        's3:GetBucketLocation',
+        's3:ListBucket',
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+      ],
+      resources: ['*'],
+    }));
+    
 
     rdsInstance.secret?.grantRead(buildProject);
 
