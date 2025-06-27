@@ -13,7 +13,7 @@ class UpdateS3:
     def __init__(self, s3_repo: Any, s3_bucket: str):
         self.s3 = s3_repo
         self.file_repo = DataFileRepo()
-        self.this_year = int(datetime.datetime.now().year)
+        self.this_year = nfl_season_year_for_today()
         self.s3_bucket = s3_bucket
 
     def initialize_s3(self):
@@ -247,3 +247,23 @@ class UpdateS3:
             Key=f"{table_name}/{table_name}.csv",
             Body=response,
         )
+
+def nfl_season_year_for_today():
+    """Return the NFL season year based on today's date.
+    If today's date is on or after this year's first Sunday of the NFL season,
+    return this year. Otherwise, return the previous year.
+    """
+    today = datetime.date.today()
+    year = today.year
+
+    # 1. Find this year's first Sunday of the NFL
+    sept_first = datetime.date(year, 9, 1)
+    first_monday_offset = (0 - sept_first.weekday()) % 7
+    labor_day = sept_first + datetime.timedelta(days=first_monday_offset)
+
+    first_nfl_sunday = labor_day + datetime.timedelta(days=6)  # Labor Day + 6 = Sunday
+
+    if today >= first_nfl_sunday:
+        return year
+    else:
+        return year - 1

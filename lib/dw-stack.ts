@@ -17,8 +17,8 @@ export class DataWarehouseStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const s3Bucket = new s3.Bucket(this, "nfl-data-bucket", {
-      bucketName: "nfl-data-bucket",
+    const s3Bucket = new s3.Bucket(this, "NFlDataLake", {
+      bucketName: "nfl-staging-datalake",
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
@@ -48,11 +48,19 @@ export class DataWarehouseStack extends Stack {
     s3Bucket.grantPut(s3Lambda);
     s3Bucket.grantReadWrite(s3Lambda)
 
+    const rdsRole = new iam.Role(this, 'RdsS3ReadRole', {
+      assumedBy: new iam.ServicePrincipal('rds.amazonaws.com'),
+      description: 'Allows RDS instances to access S3 bucket',
+    });
+
+    s3Bucket.grantRead(rdsRole);
+
     const rule = new events.Rule(this, 'ScheduleRule', {
       schedule: events.Schedule.cron({ minute: '0', hour: '12' }),
     });
 
     rule.addTarget(new targets.LambdaFunction(s3Lambda));
+
 
     const vpc = new ec2.Vpc(this, 'DwVpc', {
       maxAzs: 2, 
@@ -63,78 +71,102 @@ export class DataWarehouseStack extends Stack {
         },
         {
           name: 'private',
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
       ],
     });
-
+    
     const rdsSecurityGroup = new ec2.SecurityGroup(this, 'RDSSecurityGroup', {
       vpc,
       description: 'Security group for RDS PostgreSQL instance',
       allowAllOutbound: true,
     });
 
-    const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
-      vpc,
-      description: 'Security group for EC2',
-      allowAllOutbound: true,
-    });
-
-    const codeBuildSecurityGroup = new ec2.SecurityGroup(this, 'CodeBuildSecurityGroup', {
-      vpc,
-      description: 'Security Group for CodeBuild',
-      allowAllOutbound: true,
-    });
-
-    ec2SecurityGroup.addIngressRule(
-      ec2.Peer.ipv4('0.0.0.0/0'),
-      ec2.Port.tcp(22),
-      'Allow SSH access'
+    rdsSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(5432),
+      'Allow public access to PostgreSQL'
     );
-
-    rdsSecurityGroup.addIngressRule(ec2SecurityGroup, ec2.Port.tcp(5432), 'Allow PostgreSQL access from EC2 instance');
-    rdsSecurityGroup.addIngressRule(codeBuildSecurityGroup, ec2.Port.tcp(5432), 'Allow PostgreSQL access from CodeBuild');
-
-    const rdsRole = new iam.Role(this, 'RdsS3ReadRole', {
-      assumedBy: new iam.ServicePrincipal('rds.amazonaws.com'),
-      description: 'Allows RDS instances to access S3 bucket',
-    });
-
-    s3Bucket.grantRead(rdsRole);
 
     const parameterGroup = new rds.ParameterGroup(this, 'ParameterGroup', {
       engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_15_4}),
       parameters: {
         'shared_preload_libraries': 'pg_cron',
-        'cron.database_name': 'mocktailDWH', 
+        'cron.database_name': 'mocktailDW', 
       },
     });
 
-    const rdsInstance = new rds.DatabaseInstance(this, 'dw', {
-      engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_15_4}),
+    const rdsInstance = new rds.DatabaseInstance(this, 'DW', {
+      engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_15_13 }),
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       credentials: rds.Credentials.fromGeneratedSecret('postgres'),
-      databaseName: 'mocktailDWH',
+      databaseName: 'mocktailDW',
       vpc,
-      securityGroups: [rdsSecurityGroup],
       s3ImportRole: rdsRole,
       removalPolicy: RemovalPolicy.DESTROY,
       deletionProtection: false,
-      parameterGroup: parameterGroup
-    });
-
-    const bastion = new ec2.Instance(this, 'BastionHost', {
-      vpc,
-      instanceType: new ec2.InstanceType('t3.micro'),
-      machineImage: new ec2.AmazonLinuxImage(),
-      securityGroup: ec2SecurityGroup,
+      parameterGroup: parameterGroup,
+      publiclyAccessible: true,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC,
       },
-      keyName: 'dw-bastion-admin', // created in the console
     });
 
-    // Create CI/CD Pipeline
+    
+    // This is how I should access postgress but it become too expesneive
+    // Due to me needing a natgateway to access the internet from the VPC
+
+
+    // const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
+    //   vpc,
+    //   description: 'Security Group for EC2 (no SSH, Session Manager only)',
+    //   allowAllOutbound: true,
+    // });
+
+    // const codeBuildSecurityGroup = new ec2.SecurityGroup(this, 'CodeBuildSecurityGroup', {
+    //   vpc,
+    //   description: 'Security group for CodeBuild access to RDS',
+    //   allowAllOutbound: true,
+    // });
+
+    // rdsSecurityGroup.addIngressRule(
+    //   ec2.Peer.anyIpv4(),
+    //   ec2.Port.tcp(5432),
+    //   'Allow public access to PostgreSQL'
+    // );
+
+    // rdsSecurityGroup.addIngressRule(
+    //   codeBuildSecurityGroup,
+    //   ec2.Port.tcp(5432),
+    //   'Allow PostgreSQL access from CodeBuild'
+    // );
+    
+    // rdsSecurityGroup.addIngressRule(
+    //   ec2SecurityGroup, 
+    //   ec2.Port.tcp(5432),
+    //   'Allow PostgreSQL access from EC2 instance'
+    // );
+
+    // const ssMRole = new iam.Role(this, 'BastionSSMRole', {
+    //   assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+    //   description: 'Role for EC2 instance to connect via Session Manager',
+    //   managedPolicies: [
+    //     iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+    //   ],
+    // });
+
+    // const bastion = new ec2.Instance(this, 'BastionHost', {
+    //   vpc,
+    //   role: ssMRole,
+    //   instanceType: new ec2.InstanceType('t3.micro'),
+    //   machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+    //   securityGroup: ec2SecurityGroup,
+    //   vpcSubnets: {
+    //     subnetType: ec2.SubnetType.PUBLIC,
+    //   },
+    //   keyName: 'dw-bastion-admin', // created in the console
+    // });
+
     const sourceArtifact = new codepipeline.Artifact();
 
     const sourceAction = new codepipeline_actions.GitHubSourceAction({
@@ -145,17 +177,41 @@ export class DataWarehouseStack extends Stack {
       output: sourceArtifact,
       branch: 'main',
     });
+    
+    const buildProject = new codebuild.PipelineProject(this, 'DataWarehouseBuildProject', {
+      projectName: 'DW',
+      description: 'Builds SQL scripts',
+      subnetSelection: { subnetType: ec2.SubnetType.PUBLIC },
+      environment: {
+        buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
+      },
+      buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
+    });
+    
 
-    const buildProject = new codebuild.PipelineProject(this, 'SQLBuildProject', {
-        projectName: 'SQLBuildProject',
-        description: 'Builds SQL scripts',
-        vpc: vpc,
-        securityGroups: [codeBuildSecurityGroup],
-        environment: {
-          buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
-        },
-        buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'), 
-      });
+      buildProject.addToRolePolicy(new iam.PolicyStatement({
+        actions: [
+          // Required for networking/VPC access
+          'ec2:DescribeSubnets',
+          'ec2:DescribeSecurityGroups',
+          'ec2:DescribeNetworkInterfaces',
+          'ec2:CreateNetworkInterface',
+          'ec2:DeleteNetworkInterface',
+          'ec2:DescribeDhcpOptions',
+          'ec2:DescribeVpcs',
+          'ec2:DescribeAvailabilityZones',
+          'ec2:AttachNetworkInterface',
+          'ec2:DetachNetworkInterface',
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+          's3:GetObject',
+          's3:GetBucketLocation',
+          's3:ListBucket',
+        ],
+        resources: ['*'],
+      }));
+      
 
     rdsInstance.secret?.grantRead(buildProject);
 
@@ -165,8 +221,8 @@ export class DataWarehouseStack extends Stack {
       input: sourceArtifact,
     });
 
-    new codepipeline.Pipeline(this, 'Pipeline', {
-      pipelineName: 'MyRDSUpdatePipeline',
+    new codepipeline.Pipeline(this, 'DataWarehousePipeline', {
+      pipelineName: 'DW',
       stages: [
         {
           stageName: 'Source',
