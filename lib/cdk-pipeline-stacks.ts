@@ -56,10 +56,11 @@ export class PipelineStack extends Stack {
           "ecr:CompleteLayerUpload",
           "ecr:CreateRepository",
           "ecr:DescribeRepositories",
+          "ecr:DescribeImages",
           "ecr:GetDownloadUrlForLayer",
           "ecr:InitiateLayerUpload",
           "ecr:PutImage",
-          "ecr:UploadLayerPart",q
+          "ecr:UploadLayerPart",
         ],
         resources: ["*"],
       }));
