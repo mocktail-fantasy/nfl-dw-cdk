@@ -184,6 +184,7 @@ export class DataWarehouseStack extends Stack {
       projectName: 'DW',
       description: 'Builds SQL scripts',
       vpc: vpc,
+      securityGroups: [codeBuildSecurityGroup],
       subnetSelection: { subnetType: ec2.SubnetType.PUBLIC },
       environment: {
         buildImage: codebuild.LinuxBuildImage.fromDockerRegistry(postgresImageAsset.imageUri),
