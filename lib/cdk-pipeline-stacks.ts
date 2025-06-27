@@ -45,6 +45,29 @@ export class PipelineStack extends Stack {
       }),
     });
 
+    const assetPublishProject = new codebuild.PipelineProject(this, "AssetPublishProject", {
+        projectName: "CdkAssetsPublish",
+        description: "Publishes CDK assets (Lambda zips, Docker images) to S3/ECR",
+        environment: {
+          buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
+        },
+        buildSpec: codebuild.BuildSpec.fromObject({
+          version: "0.2",
+          phases: {
+            install: {
+              commands: [
+                "npm install -g aws-cdk"
+              ],
+            },
+            build: {
+              commands: [
+                "npx cdk-assets publish --path manifest.json"
+              ],
+            },
+          },
+        }),
+      });
+
     buildProject.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         "cloudformation:*",
@@ -74,6 +97,12 @@ export class PipelineStack extends Stack {
       outputs: [cloudAssemblyOutput],
     });
 
+    const assetPublishAction = new codepipeline_actions.CodeBuildAction({
+        actionName: 'PublishAssets',
+        project: assetPublishProject,
+        input: cloudAssemblyOutput,
+      });
+      
     const deployPipelineAction = new codepipeline_actions.CloudFormationCreateUpdateStackAction({
       actionName: "Deploy_PipelineStack",
       templatePath: cloudAssemblyOutput.atPath("CDKPipelineStack.template.json"),
@@ -99,6 +128,10 @@ export class PipelineStack extends Stack {
         {
           stageName: "Build",
           actions: [buildAction],
+        },
+        {
+          stageName: "Assets",
+          actions: [assetPublishAction],
         },
         {
           stageName: "Deploy",
