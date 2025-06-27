@@ -27,7 +27,7 @@ export class PipelineStack extends Stack {
               nodejs: "18",
             },
             commands: [
-              "npm install -g aws-cdk",
+              "npm install -g aws-cdk@2.139.0",
               "npm ci",
             ],
           },
