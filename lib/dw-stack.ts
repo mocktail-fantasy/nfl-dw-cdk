@@ -85,14 +85,6 @@ export class DataWarehouseStack extends Stack {
       service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
     });
     
-    // vpc.addInterfaceEndpoint('EcrApiEndpoint', {
-    //   service: ec2.InterfaceVpcEndpointAwsService.ECR,
-    // });
-    
-    // vpc.addInterfaceEndpoint('EcrDockerEndpoint', {
-    //   service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
-    // });
-    
     const rdsSecurityGroup = new ec2.SecurityGroup(this, 'RDSSecurityGroup', {
       vpc,
       description: 'Security group for RDS PostgreSQL instance',
@@ -140,7 +132,14 @@ export class DataWarehouseStack extends Stack {
       ec2.Port.tcp(5432),
       'Allow PostgreSQL access from CodeBuild'
     );
+
+    rdsSecurityGroup.addIngressRule(
+      ec2SecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from EC2'
+    );
     
+  
     const ssMRole = new iam.Role(this, 'BastionSSMRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       description: 'Role for EC2 instance to connect via Session Manager',
