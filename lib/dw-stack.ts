@@ -85,17 +85,13 @@ export class DataWarehouseStack extends Stack {
       service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
     });
     
-    // vpc.addInterfaceEndpoint('CodeBuildLogsEndpoint', {
-    //   service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+    // vpc.addInterfaceEndpoint('EcrApiEndpoint', {
+    //   service: ec2.InterfaceVpcEndpointAwsService.ECR,
     // });
-
-    vpc.addInterfaceEndpoint('EcrApiEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR,
-    });
     
-    vpc.addInterfaceEndpoint('EcrDockerEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
-    });
+    // vpc.addInterfaceEndpoint('EcrDockerEndpoint', {
+    //   service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
+    // });
     
     const rdsSecurityGroup = new ec2.SecurityGroup(this, 'RDSSecurityGroup', {
       vpc,
