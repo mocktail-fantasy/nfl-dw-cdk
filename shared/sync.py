@@ -13,7 +13,8 @@ class UpdateS3:
     def __init__(self, s3_repo: Any, s3_bucket: str):
         self.s3 = s3_repo
         self.file_repo = DataFileRepo()
-        self.this_year = nfl_season_year_for_today()
+        self.in_season_year = nfl_in_season_year_for_today()
+        self.off_season_year = nfl_off_season_year_for_today()
         self.s3_bucket = s3_bucket
 
     def initialize_s3(self):
@@ -38,22 +39,22 @@ class UpdateS3:
 
     def update_s3(self):
         print("updating s3 data..")
-        self.insert_play_by_play_csv(self.this_year)
+        self.insert_play_by_play_csv(self.in_season_year)
         self.insert_all_players_csvs()
-        self.insert_weekly_csv(self.this_year)
+        self.insert_weekly_csv(self.in_season_year)
         self.insert_all_combine_csvs()
-        self.insert_injury_csv(self.this_year)
-        self.insert_ngs_rushing_csv(self.this_year)
-        self.insert_ngs_passing_csv(self.this_year)
-        self.insert_ngs_receiving_csv(self.this_year)
-        self.insert_depth_chart_csv(self.this_year)
-        self.insert_pfr_rushing_csv(self.this_year)
-        self.insert_pfr_passing_csv(self.this_year)
-        self.insert_pfr_receiving_csv(self.this_year)
-        self.insert_snaps_csv(self.this_year)
+        self.insert_injury_csv(self.in_season_year)
+        self.insert_ngs_rushing_csv(self.in_season_year)
+        self.insert_ngs_passing_csv(self.in_season_year)
+        self.insert_ngs_receiving_csv(self.in_season_year)
+        self.insert_depth_chart_csv(self.in_season_year)
+        self.insert_pfr_rushing_csv(self.in_season_year)
+        self.insert_pfr_passing_csv(self.in_season_year)
+        self.insert_pfr_receiving_csv(self.in_season_year)
+        self.insert_snaps_csv(self.in_season_year)
         self.insert_all_game_odds_csvs()
-        self.insert_ftn_csv(self.this_year)
-        self.insert_roster_csv(self.this_year)
+        self.insert_ftn_csv(self.in_season_year)
+        self.insert_roster_csv(self.off_season_year)
         self.insert_all_player_ids_csvs()
 
     def run_transform_stored_proc(self):
@@ -67,7 +68,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_play_by_play_csvs(self):
-        for year in range(1999, self.this_year + 1):
+        for year in range(1999, self.in_season_year + 1):
             self.insert_play_by_play_csv(year)
 
     def insert_all_players_csvs(self):
@@ -88,7 +89,7 @@ class UpdateS3:
         )
 
     def insert_all_weekly_csvs(self):
-        for year in range(1999, self.this_year + 1):
+        for year in range(1999, self.in_season_year + 1):
             self.insert_weekly_csv(year)
 
     def insert_injury_csv(self, year):
@@ -98,7 +99,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_injury_csvs(self):
-        for year in range(2009, self.this_year + 1):
+        for year in range(2009, self.in_season_year + 1):
             self.insert_injury_csv(year)
 
     def insert_all_combine_csvs(self):
@@ -121,7 +122,7 @@ class UpdateS3:
         )
 
     def insert_all_ngs_rushing_csvs(self):
-        for year in range(2016, self.this_year + 1):
+        for year in range(2016, self.in_season_year + 1):
             self.insert_ngs_rushing_csv(year)
 
     def insert_ngs_passing_csv(self, year):
@@ -138,7 +139,7 @@ class UpdateS3:
         )
 
     def insert_all_ngs_passing_csvs(self):
-        for year in range(2016, self.this_year + 1):
+        for year in range(2016, self.in_season_year + 1):
             self.insert_ngs_passing_csv(year)
 
     def insert_ngs_receiving_csv(self, year):
@@ -155,7 +156,7 @@ class UpdateS3:
         )
 
     def insert_all_ngs_receiving_csvs(self):
-        for year in range(2016, self.this_year + 1):
+        for year in range(2016, self.in_season_year + 1):
             self.insert_ngs_receiving_csv(year)
 
     def insert_depth_chart_csv(self, year):
@@ -165,7 +166,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_depth_chart_csvs(self):
-        for year in range(2001, self.this_year + 1):
+        for year in range(2001, self.in_season_year + 1):
             self.insert_depth_chart_csv(year)
 
     def insert_pfr_receiving_csv(self, year):
@@ -175,7 +176,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_pfr_receiving_csvs(self):
-        for year in range(2018, self.this_year + 1):
+        for year in range(2018, self.in_season_year + 1):
             self.insert_pfr_receiving_csv(year)
 
     def insert_pfr_rushing_csv(self, year):
@@ -185,7 +186,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_pfr_rushing_csvs(self):
-        for year in range(2018, self.this_year + 1):
+        for year in range(2018, self.in_season_year + 1):
             self.insert_pfr_rushing_csv(year)
 
     def insert_pfr_passing_csv(self, year):
@@ -195,7 +196,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_pfr_passing_csvs(self):
-        for year in range(2018, self.this_year + 1):
+        for year in range(2018, self.in_season_year + 1):
             self.insert_pfr_passing_csv(year)
 
     def insert_snaps_csv(self, year):
@@ -205,7 +206,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_snaps_csvs(self):
-        for year in range(2012, self.this_year + 1):
+        for year in range(2012, self.in_season_year + 1):
             self.insert_snaps_csv(year)
 
     def insert_ftn_csv(self, year):
@@ -215,7 +216,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_ftn_csvs(self):
-        for year in range(2022, self.this_year + 1):
+        for year in range(2022, self.in_season_year + 1):
             self.insert_ftn_csv(year)
 
     def insert_roster_csv(self, year):
@@ -225,7 +226,7 @@ class UpdateS3:
         self.s3.put_object(Bucket=self.s3_bucket, Key=f"{table_name}/{year}.csv", Body=response)
 
     def insert_all_roster_csvs(self):
-        for year in range(2002, self.this_year + 1):
+        for year in range(2002, self.in_season_year + 1):
             self.insert_roster_csv(year)
 
     def insert_all_game_odds_csvs(self):
@@ -248,7 +249,7 @@ class UpdateS3:
             Body=response,
         )
 
-def nfl_season_year_for_today():
+def nfl_in_season_year_for_today():
     """Return the NFL season year based on today's date.
     If today's date is on or after this year's first Sunday of the NFL season,
     return this year. Otherwise, return the previous year.
@@ -264,6 +265,25 @@ def nfl_season_year_for_today():
     first_nfl_sunday = labor_day + datetime.timedelta(days=6)  # Labor Day + 6 = Sunday
 
     if today >= first_nfl_sunday:
+        return year
+    else:
+        return year - 1
+
+import datetime
+
+def nfl_off_season_year_for_today():
+    """Return the NFL season year based on today's date.
+    If today's date is on or after this year's NFL offseason start (new league year),
+    return this year. Otherwise, return the previous year.
+    """
+    today = datetime.date.today()
+    year = today.year
+
+    # Approximate new league year start (offseason begins)
+    # In reality, it's usually around March 12 at 4 p.m. ET.
+    offseason_start = datetime.date(year, 3, 12)
+
+    if today >= offseason_start:
         return year
     else:
         return year - 1
