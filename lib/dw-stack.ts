@@ -60,7 +60,13 @@ export class DataWarehouseStack extends Stack {
     });
 
     s3DataLake.grantRead(rdsRole);
-    s3Cache.grantWrite(rdsRole);
+
+    const rdsExportRole = new iam.Role(this, 'RdsS3ExportRole', {
+      assumedBy: new iam.ServicePrincipal('rds.amazonaws.com'),
+      description: 'Allows RDS instances to write data to the S3 cache bucket',
+    });
+
+    s3Cache.grantWrite(rdsExportRole);
 
     const rule = new events.Rule(this, 'ScheduleRule', {
       schedule: events.Schedule.cron({ minute: '0', hour: '12' }),
@@ -127,7 +133,7 @@ export class DataWarehouseStack extends Stack {
 
     cfnRdsInstance.addPropertyOverride('AssociatedRoles', [{
       FeatureName: 's3Export',
-      RoleArn: rdsRole.roleArn,
+      RoleArn: rdsExportRole.roleArn,
     }]);
 
     const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
@@ -167,7 +173,10 @@ export class DataWarehouseStack extends Stack {
       vpc,
       role: ssMRole,
       instanceType: new ec2.InstanceType('t3.micro'),
-      machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+      machineImage: ec2.MachineImage.lookup({
+        name: 'al2023-ami-2023.*-x86_64',
+        owners: ['amazon'],
+      }), // need to be specific or it blows it away
       securityGroup: ec2SecurityGroup,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC,
