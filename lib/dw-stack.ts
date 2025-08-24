@@ -18,8 +18,13 @@ export class DataWarehouseStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const s3Bucket = new s3.Bucket(this, "NFlDataLake", {
+    const s3DataLake = new s3.Bucket(this, "NFlDataLake", {
       bucketName: "nfl-staging-datalake",
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    const s3Cache = new s3.Bucket(this, "NFlCache", {
+      bucketName: "nfl-cache",
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
@@ -41,20 +46,21 @@ export class DataWarehouseStack extends Stack {
       ephemeralStorageSize: Size.mebibytes(1024), // Ephemeral storage size in MB
       timeout: Duration.seconds(900),
       environment: {
-        "NFL_DATA_BUCKET": s3Bucket.bucketName
+        "NFL_DATA_BUCKET": s3DataLake.bucketName
       },
       handler: 'lambda_function.lambda_handler',
     });
 
-    s3Bucket.grantPut(s3Lambda);
-    s3Bucket.grantReadWrite(s3Lambda)
+    s3DataLake.grantPut(s3Lambda);
+    s3DataLake.grantReadWrite(s3Lambda);
 
     const rdsRole = new iam.Role(this, 'RdsS3ReadRole', {
       assumedBy: new iam.ServicePrincipal('rds.amazonaws.com'),
       description: 'Allows RDS instances to access S3 bucket',
     });
 
-    s3Bucket.grantRead(rdsRole);
+    s3DataLake.grantRead(rdsRole);
+    s3Cache.grantWrite(rdsRole);
 
     const rule = new events.Rule(this, 'ScheduleRule', {
       schedule: events.Schedule.cron({ minute: '0', hour: '12' }),
@@ -114,6 +120,15 @@ export class DataWarehouseStack extends Stack {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
     });
+
+    // AI Trickery!! Need to add the s3ExportRole to RDS after it has been created. 
+    // This is apparenlty how?? I will not question the AI gods. 
+    const cfnRdsInstance = rdsInstance.node.defaultChild as rds.CfnDBInstance;
+
+    cfnRdsInstance.addPropertyOverride('AssociatedRoles', [{
+      FeatureName: 's3Export',
+      RoleArn: rdsRole.roleArn,
+    }]);
 
     const ec2SecurityGroup = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
       vpc,
